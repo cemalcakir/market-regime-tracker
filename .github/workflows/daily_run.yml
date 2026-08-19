@@ -1,0 +1,66 @@
+name: Daily Market Reports
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # 09:00 TR time (UTC 06:00)
+  workflow_dispatch: # Enables manual execution button
+
+jobs:
+  market-analysis:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install yfinance pandas numpy matplotlib requests
+          
+      # 0. Initial Message (Date Header)
+      - name: Run Initial Message
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python initial_message.py
+        
+      # 1. S&P 500 Analysis
+      - name: Run S&P 500 Analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python sp500_bot.py
+
+      # 2. Gold Analysis
+      - name: Run Gold Analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python gold_bot.py
+
+      # 3. Bitcoin Analysis
+      - name: Run Bitcoin Analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bitcoin_bot.py
+
+      # 4. BIST 100 Analysis
+      - name: Run BIST 100 Analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bist_bot.py
+
+      # 5. Sector Rotation Analysis (XLI / XLU)
+      - name: Run Sector Rotation Analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python sector_rotation_bot.py
