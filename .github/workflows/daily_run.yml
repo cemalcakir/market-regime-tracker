@@ -58,9 +58,9 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python bist_bot.py
 
-      # 5. Sector Rotation Analysis (XLI / XLU)
-      - name: Run Sector Rotation Analysis
+      # 5. Multi Asset Rotation Analysis (XLI / XLU)
+      - name: Run Multi Asset Rotation Analysis
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python sector_rotation_bot.py
+        run: python multi_asset_rotation_bot.py
