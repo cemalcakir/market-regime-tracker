@@ -24,8 +24,7 @@ if TOKEN is None or CHAT_ID is None:
 # ==========================================
 # 2. WATCHLIST & STRATEGY CALCULATIONS
 # ==========================================
-# 1x Unleveraged Sector & Index ETFs Universe
-TICKERS = ["SMH", "XBI", "QQQ", "SPY"]
+TICKERS = ["SOXL", "LABU", "TQQQ", "UPRO"]
 
 print("--------------------------------------------------")
 print(f"Fetching financial data for tickers: {TICKERS}")
@@ -45,9 +44,9 @@ for ticker in TICKERS:
     df[f"{ticker}_Open"] = open_df[ticker]
     df[f"{ticker}_SMA50"] = df[ticker].rolling(50).mean()
     df[f"{ticker}_ROC20"] = df[ticker].pct_change(20) * 100
-    # Bull condition for 1x ETFs: Price above 50-day SMA AND 20-day momentum > +3%
+    # Bull condition: Price above 50-day SMA AND 20-day momentum > +10%
     df[f"{ticker}_Bull"] = (df[ticker] > df[f"{ticker}_SMA50"]) & (
-        df[f"{ticker}_ROC20"] > 3.0
+        df[f"{ticker}_ROC20"] > 10
     )
 
 # Target Position Decision (Select strongest ROC20 bull asset, else CASH)
@@ -89,7 +88,7 @@ active_pos = last_row["Executed_Position"]
 latest_date = df.index[-1].strftime("%Y-%m-%d")
 
 print("==================================================")
-print(f"       1X ETF MOMENTUM ROTATION STATUS ({latest_date})")
+print(f"       MULTI-ASSET ROTATION STATUS ({latest_date})")
 print("==================================================")
 
 if today_signal == active_pos:
@@ -132,13 +131,13 @@ ax1.set_facecolor("#0B0E11")
 ax2.set_facecolor("#0B0E11")
 ax3.set_facecolor("#0B0E11")
 
-# Asset specific theme colors for 1x ETFs
+# Asset specific theme colors
 color_map = {
-    "SMH": "#00F2FF",   # Neon Cyan (Semiconductors)
-    "XBI": "#FF9900",   # Neon Orange (Biotech)
-    "QQQ": "#FF00FF",   # Neon Magenta (Nasdaq 100)
-    "SPY": "#FFFF00",   # Yellow (S&P 500)
-    "CASH": "#FF0055",  # Neon Pink/Red (Cash)
+    "SOXL": "#00F2FF",  # Neon Cyan
+    "LABU": "#FF9900",  # Neon Orange
+    "TQQQ": "#FF00FF",  # Neon Magenta
+    "UPRO": "#FFFF00",  # Yellow
+    "CASH": "#FF0055",  # Neon Red/Pink
 }
 
 # --- Panel 1: Strategy Equity Curve ---
@@ -147,7 +146,7 @@ ax1.plot(
     df["Strategy_Cum"],
     color="#00FF7F",
     lw=2.5,
-    label="1x ETF Strategy Cumulative Return",
+    label="Multi-Asset Strategy Cumulative Return",
 )
 ax1.set_title(
     "1. STRATEGY EQUITY CURVE (PORTFOLIO GROWTH)",
@@ -171,7 +170,7 @@ for ticker in TICKERS:
         label=f"{ticker} Price ($)",
     )
 ax2.set_title(
-    "2. INDIVIDUAL ETF PRICE CHARTS",
+    "2. INDIVIDUAL LEVERAGED ETF PRICE CHARTS",
     fontsize=11,
     pad=10,
     color="white",
@@ -247,7 +246,7 @@ if today_signal == active_pos:
     description = (
         f"Momentum leadership maintained. Capital stays 100% in {active_pos}."
         if active_pos != "CASH"
-        else "No bull criteria met across universe. Capital stays 100% in CASH."
+        else "No leverage criteria met across universe. Capital stays 100% in CASH."
     )
 else:
     action_text = f"<b>ACTION:</b> ROTATE CAPITAL FROM {active_pos} ➔ {today_signal} AT NEXT OPEN 🚨"
@@ -263,12 +262,12 @@ for ticker in TICKERS:
     metrics_text += f"• <b>{ticker}:</b> ${price:.2f} | SMA50: ${sma:.2f} | 20D Mom: {roc:.1f}% | Bull: {status_str}\n"
 
 message = (
-    f"📊 <b>1X ETF MOMENTUM ROTATION SIGNAL</b>\n\n"
+    f"🌐 <b>MULTI-ASSET LEVERAGED ROTATION SIGNAL</b>\n\n"
     f"{action_text}\n"
     f"<b>Description:</b> {description}\n\n"
     f"📌 <b>Active Allocation:</b> {active_pos}\n"
     f"🎯 <b>Target Allocation:</b> {today_signal}\n\n"
-    f"📋 <b>UNIVERSE METRICS:</b>\n"
+    f"📊 <b>UNIVERSE METRICS:</b>\n"
     f"{metrics_text}\n"
     f"📈 <b>1Y Strategy Performance:</b> {df['Strategy_Cum'].iloc[-1]:.2f}x ({(df['Strategy_Cum'].iloc[-1]-1)*100:.1f}%)"
 )

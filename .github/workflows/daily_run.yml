@@ -42,3 +42,6 @@ jobs:
 
       - name: Run Multi Asset Rotation Analysis
         run: python multi_asset_rotation_bot.py
+
+      - name: Leveraged Run Multi Asset Rotation Analysis
+        run: python multi_asset_rotation_bot.py
