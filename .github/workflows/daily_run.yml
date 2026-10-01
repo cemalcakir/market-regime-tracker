@@ -40,6 +40,9 @@ jobs:
       - name: Run BIST 100 Analysis
         run: python bist_bot.py
 
+      - name: Macro Momentum Rotation Analysis
+        run: python macro_momentum_rotation.py
+
       - name: Run Multi Asset Rotation Analysis
         run: python multi_asset_rotation_bot.py
 
