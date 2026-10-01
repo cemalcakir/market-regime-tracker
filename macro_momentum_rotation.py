@@ -26,6 +26,7 @@ if TOKEN is None or CHAT_ID is None:
 # ==========================================
 # 5-Asset Global Macro Universe
 TICKERS = ["SPY", "GLD", "TLT", "BTC-USD", "USO"]
+MIN_HOLD_DAYS = 3  # Minimum position holding period to eliminate whipsaws
 
 print("--------------------------------------------------")
 print(f"Fetching financial data for macro universe: {TICKERS}")
@@ -54,8 +55,8 @@ for ticker in TICKERS:
         df[f"{ticker}_ROC20"] > 3.0
     )
 
-# Target Position Decision (Select strongest ROC20 bull asset, else CASH)
-target_positions = []
+# Raw Target Position Decision (Select strongest ROC20 bull asset, else CASH)
+raw_target_positions = []
 for i in range(len(df)):
     bull_candidates = []
     for ticker in TICKERS:
@@ -65,11 +66,32 @@ for i in range(len(df)):
 
     if bull_candidates:
         bull_candidates.sort(key=lambda x: x[1], reverse=True)
-        target_positions.append(bull_candidates[0][0])
+        raw_target_positions.append(bull_candidates[0][0])
     else:
-        target_positions.append("CASH")
+        raw_target_positions.append("CASH")
 
-df["Target_Position"] = target_positions
+# Apply Minimum Hold Period Filter (Smoothen 1-day noise/whipsaws)
+smoothed_target_positions = []
+hold_counter = 0
+current_pos = "CASH"
+
+for i in range(len(df)):
+    raw_pos = raw_target_positions[i]
+
+    # If currently holding an asset and hold period has not expired, lock position
+    if hold_counter < MIN_HOLD_DAYS and current_pos != "CASH":
+        smoothed_target_positions.append(current_pos)
+        hold_counter += 1
+    else:
+        # Rebalancing decision allowed
+        if raw_pos != current_pos:
+            current_pos = raw_pos
+            hold_counter = 1
+        else:
+            hold_counter += 1
+        smoothed_target_positions.append(current_pos)
+
+df["Target_Position"] = smoothed_target_positions
 # Executed Position takes place on Next Open / Shifted by 1 day
 df["Executed_Position"] = df["Target_Position"].shift(1).fillna("CASH")
 
@@ -152,7 +174,7 @@ ax1.plot(
     df["Strategy_Cum"],
     color="#00FF7F",
     lw=2.5,
-    label="Macro Rotation Strategy Cumulative Return",
+    label="Macro Rotation Strategy Cumulative Return (3D Filtered)",
 )
 ax1.set_title(
     "1. STRATEGY EQUITY CURVE (PORTFOLIO GROWTH)",
@@ -201,7 +223,7 @@ for ticker in TICKERS + ["CASH"]:
     )
 
 ax3.set_title(
-    "3. HISTORICAL ASSET ALLOCATION TIMELINE (MACRO ROTATION MAP)",
+    "3. HISTORICAL ASSET ALLOCATION TIMELINE (3-DAY NOISE FILTERED MAP)",
     fontsize=11,
     pad=10,
     color="gray",
