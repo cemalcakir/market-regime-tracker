@@ -34,8 +34,12 @@ print("--------------------------------------------------\n")
 # Download 1-year data for daily calculations
 df_all = yf.download(TICKERS, period="1y", progress=False)
 
-close_df = df_all["Close"].dropna()
-open_df = df_all["Open"].dropna()
+# Clean and align missing weekend dates for mixed asset classes
+close_df = df_all["Close"].ffill().dropna()
+open_df = df_all["Open"].ffill().dropna()
+
+# Pre-calculate daily returns based on clean close prices
+returns_df = close_df.pct_change().fillna(0)
 
 df = pd.DataFrame(index=close_df.index)
 
@@ -69,12 +73,12 @@ df["Target_Position"] = target_positions
 # Executed Position takes place on Next Open / Shifted by 1 day
 df["Executed_Position"] = df["Target_Position"].shift(1).fillna("CASH")
 
-# Dynamic Strategy Return Calculation
+# Accurate Dynamic Strategy Return Calculation
 strat_ret = np.zeros(len(df))
 for i in range(1, len(df)):
     exec_pos = df["Executed_Position"].iloc[i]
     if exec_pos in TICKERS:
-        strat_ret[i] = df[exec_pos].pct_change().iloc[i]
+        strat_ret[i] = returns_df[exec_pos].iloc[i]
     else:
         strat_ret[i] = 0.0
 
@@ -134,12 +138,12 @@ ax3.set_facecolor("#0B0E11")
 
 # Color mapping for Macro Universe
 color_map = {
-    "SPY": "#00F2FF",      # Cyan (US Equities)
-    "GLD": "#FFD700",      # Gold (Gold)
-    "TLT": "#00FF7F",      # Spring Green (Treasuries)
-    "BTC-USD": "#FF00FF",  # Magenta (Bitcoin)
-    "USO": "#FF9900",      # Orange (Crude Oil)
-    "CASH": "#FF0055",     # Neon Pink/Red (Cash)
+    "SPY": "#00F2FF",      # Cyan
+    "GLD": "#FFD700",      # Gold
+    "TLT": "#00FF7F",      # Spring Green
+    "BTC-USD": "#FF00FF",  # Magenta
+    "USO": "#FF9900",      # Orange
+    "CASH": "#FF0055",     # Pink/Red
 }
 
 # --- Panel 1: Strategy Equity Curve ---
@@ -161,7 +165,7 @@ ax1.set_title(
 ax1.grid(color="#1E222D", alpha=0.4, linestyle="--")
 ax1.legend(loc="upper left")
 
-# --- Panel 2: Asset Price Movements (Normalized to 100 for Comparison) ---
+# --- Panel 2: Relative Asset Performance ---
 for ticker in TICKERS:
     norm_series = (df[ticker] / df[ticker].iloc[0]) * 100
     ax2.plot(
@@ -183,7 +187,7 @@ ax2.set_title(
 ax2.grid(color="#1E222D", alpha=0.4, linestyle="--")
 ax2.legend(loc="upper left")
 
-# --- Panel 3: Position Timeline (Rotation Map) ---
+# --- Panel 3: Position Timeline ---
 for ticker in TICKERS + ["CASH"]:
     mask = df["Executed_Position"] == ticker
     ax3.fill_between(
