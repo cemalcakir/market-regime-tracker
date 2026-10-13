@@ -26,7 +26,7 @@ if TOKEN is None or CHAT_ID is None:
 # ==========================================
 # 5-Asset Global Macro Universe
 TICKERS = ["SPY", "GLD", "TLT", "BTC-USD", "USO"]
-MIN_HOLD_DAYS = 3  # Minimum position holding period to eliminate whipsaws
+MIN_HOLD_DAYS = 3  # Minimum position holding period for asset rotations
 
 print("--------------------------------------------------")
 print(f"Fetching financial data for macro universe: {TICKERS}")
@@ -70,7 +70,7 @@ for i in range(len(df)):
     else:
         raw_target_positions.append("CASH")
 
-# Apply Minimum Hold Period Filter (Smoothen 1-day noise/whipsaws)
+# Apply Minimum Hold Period Filter with CASH Safety Override
 smoothed_target_positions = []
 hold_counter = 0
 current_pos = "CASH"
@@ -78,18 +78,28 @@ current_pos = "CASH"
 for i in range(len(df)):
     raw_pos = raw_target_positions[i]
 
-    # If currently holding an asset and hold period has not expired, lock position
-    if hold_counter < MIN_HOLD_DAYS and current_pos != "CASH":
-        smoothed_target_positions.append(current_pos)
-        hold_counter += 1
+    # SAFETY OVERRIDE: If market condition fails and target is CASH, drop immediately!
+    if raw_pos == "CASH":
+        current_pos = "CASH"
+        hold_counter = 0
+        smoothed_target_positions.append("CASH")
     else:
-        # Rebalancing decision allowed
-        if raw_pos != current_pos:
-            current_pos = raw_pos
-            hold_counter = 1
-        else:
+        # If holding an asset and within min hold period
+        if hold_counter < MIN_HOLD_DAYS and current_pos == raw_pos:
             hold_counter += 1
-        smoothed_target_positions.append(current_pos)
+            smoothed_target_positions.append(current_pos)
+        elif hold_counter < MIN_HOLD_DAYS and current_pos != raw_pos and current_pos != "CASH":
+            # Lock position during hold period for asset-to-asset switches
+            hold_counter += 1
+            smoothed_target_positions.append(current_pos)
+        else:
+            # Hold period expired or moving from CASH to an asset
+            if raw_pos != current_pos:
+                current_pos = raw_pos
+                hold_counter = 1
+            else:
+                hold_counter += 1
+            smoothed_target_positions.append(current_pos)
 
 df["Target_Position"] = smoothed_target_positions
 # Executed Position takes place on Next Open / Shifted by 1 day
@@ -174,7 +184,7 @@ ax1.plot(
     df["Strategy_Cum"],
     color="#00FF7F",
     lw=2.5,
-    label="Macro Rotation Strategy Cumulative Return (3D Filtered)",
+    label="Macro Rotation Strategy Cumulative Return (Safe Filtered)",
 )
 ax1.set_title(
     "1. STRATEGY EQUITY CURVE (PORTFOLIO GROWTH)",
@@ -223,7 +233,7 @@ for ticker in TICKERS + ["CASH"]:
     )
 
 ax3.set_title(
-    "3. HISTORICAL ASSET ALLOCATION TIMELINE (3-DAY NOISE FILTERED MAP)",
+    "3. HISTORICAL ASSET ALLOCATION TIMELINE (SAFE ROTATION MAP)",
     fontsize=11,
     pad=10,
     color="gray",
