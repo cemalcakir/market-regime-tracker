@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import time
 
 try:
     from google import genai
@@ -38,13 +39,22 @@ class MarketAIAnalyst:
         3. Strategic takeaway for traders.
         """
 
-        try:
-            response = self.client.models.generate_content(
-                model='gemini-3.8-flash',
-                contents=prompt,
-            )
-            return response.text
-        except Exception as e:
-            error_msg = f"AI generation error: {e}"
-            logger.error(error_msg)
-            return error_msg
+        models_to_try = ['gemini-3.8-flash', 'gemini-3.1-flash-lite']
+
+        for model_name in models_to_try:
+            for attempt in range(2):
+                try:
+                    response = self.client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                    )
+                    return response.text
+                except Exception as e:
+                    logger.warning(f"Model {model_name} attempt {attempt+1} failed: {e}")
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        time.sleep(2)
+                        continue
+                    else:
+                        break
+
+        return "AI commentary temporarily unavailable due to high server demand."
