@@ -6,6 +6,9 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+# Ortak AI Servis importu
+from ai_service import MarketAIAnalyst
+
 # ==========================================
 # 1. CREDENTIALS MANAGEMENT
 # ==========================================
@@ -21,17 +24,18 @@ if TOKEN is None or CHAT_ID is None:
     except ImportError:
         print("Error: Telegram credentials not found!")
 
+# AI Analist Servisini Başlat
+ai_analyst = MarketAIAnalyst()
+
 # ==========================================
 # 2. WATCHLIST & STRATEGY CALCULATIONS
 # ==========================================
-# 1x Unleveraged Sector & Index ETFs Universe
 TICKERS = ["SMH", "XBI", "QQQ", "SPY"]
 
 print("--------------------------------------------------")
 print(f"Fetching financial data for tickers: {TICKERS}")
 print("--------------------------------------------------\n")
 
-# Download 1-year data for daily calculations
 df_all = yf.download(TICKERS, period="1y", progress=False)
 
 close_df = df_all["Close"].dropna()
@@ -39,18 +43,15 @@ open_df = df_all["Open"].dropna()
 
 df = pd.DataFrame(index=close_df.index)
 
-# Calculate indicators for each ETF
 for ticker in TICKERS:
     df[ticker] = close_df[ticker]
     df[f"{ticker}_Open"] = open_df[ticker]
     df[f"{ticker}_SMA50"] = df[ticker].rolling(50).mean()
     df[f"{ticker}_ROC20"] = df[ticker].pct_change(20) * 100
-    # Bull condition for 1x ETFs: Price above 50-day SMA AND 20-day momentum > +3%
     df[f"{ticker}_Bull"] = (df[ticker] > df[f"{ticker}_SMA50"]) & (
         df[f"{ticker}_ROC20"] > 3.0
     )
 
-# Target Position Decision (Select strongest ROC20 bull asset, else CASH)
 target_positions = []
 for i in range(len(df)):
     bull_candidates = []
@@ -66,10 +67,8 @@ for i in range(len(df)):
         target_positions.append("CASH")
 
 df["Target_Position"] = target_positions
-# Executed Position takes place on Next Open / Shifted by 1 day
 df["Executed_Position"] = df["Target_Position"].shift(1).fillna("CASH")
 
-# Dynamic Strategy Return Calculation
 strat_ret = np.zeros(len(df))
 for i in range(1, len(df)):
     exec_pos = df["Executed_Position"].iloc[i]
@@ -104,12 +103,19 @@ print(f"Target Allocation : {today_signal}")
 print("--------------------------------------------------")
 print("UNIVERSE METRICS:")
 
+universe_metrics_dict = {}
 for ticker in TICKERS:
     price = last_row[ticker]
     sma = last_row[f"{ticker}_SMA50"]
     roc = last_row[f"{ticker}_ROC20"]
     is_bull = last_row[f"{ticker}_Bull"]
     bull_str = "YES" if is_bull else "NO"
+    universe_metrics_dict[ticker] = {
+        "Price": float(price),
+        "SMA50": float(sma),
+        "20D Momentum (%)": float(roc),
+        "Bull Status": bull_str
+    }
     print(
         f"  • {ticker:4s} | Price: ${price:6.2f} | SMA50: ${sma:6.2f} | 20D Mom: {roc:6.1f}% | Bull: {bull_str}"
     )
@@ -132,7 +138,6 @@ ax1.set_facecolor("#0B0E11")
 ax2.set_facecolor("#0B0E11")
 ax3.set_facecolor("#0B0E11")
 
-# Asset specific theme colors for 1x ETFs
 color_map = {
     "SMH": "#00F2FF",   # Neon Cyan (Semiconductors)
     "XBI": "#FF9900",   # Neon Orange (Biotech)
@@ -141,7 +146,6 @@ color_map = {
     "CASH": "#FF0055",  # Neon Pink/Red (Cash)
 }
 
-# --- Panel 1: Strategy Equity Curve ---
 ax1.plot(
     df.index,
     df["Strategy_Cum"],
@@ -160,7 +164,6 @@ ax1.set_title(
 ax1.grid(color="#1E222D", alpha=0.4, linestyle="--")
 ax1.legend(loc="upper left")
 
-# --- Panel 2: Individual Asset Price Charts ---
 for ticker in TICKERS:
     ax2.plot(
         df.index,
@@ -182,7 +185,6 @@ ax2.set_yscale("log")
 ax2.grid(color="#1E222D", alpha=0.4, linestyle="--")
 ax2.legend(loc="upper left")
 
-# --- Panel 3: Position Timeline (Rotation Map) ---
 for ticker in TICKERS + ["CASH"]:
     mask = df["Executed_Position"] == ticker
     ax3.fill_between(
@@ -217,7 +219,7 @@ plt.close()
 
 
 # ==========================================
-# 5. TELEGRAM DISPATCH
+# 5. TELEGRAM DISPATCH & AI COMMENTARY
 # ==========================================
 def send_telegram_message(message, file_path=None):
     if not TOKEN or not CHAT_ID:
@@ -241,7 +243,16 @@ def send_telegram_message(message, file_path=None):
         print(f"Telegram Error: {e}")
 
 
-# Construct Telegram Notification Text
+# AI Strategy Commentary Generation for 1x ETF Rotation
+etf_payload = {
+    "Active Allocation": active_pos,
+    "Target Allocation": today_signal,
+    "Universe Metrics": universe_metrics_dict,
+    "1Y Strategy Cumulative Growth": float(df['Strategy_Cum'].iloc[-1])
+}
+ai_comment = ai_analyst.generate_commentary("1x Sector & Index ETF Universe (SMH, XBI, QQQ, SPY)", etf_payload)
+
+
 if today_signal == active_pos:
     action_text = f"<b>ACTION:</b> HOLD {active_pos} POSITION 🟢"
     description = (
@@ -272,5 +283,8 @@ message = (
     f"{metrics_text}\n"
     f"📈 <b>1Y Strategy Performance:</b> {df['Strategy_Cum'].iloc[-1]:.2f}x ({(df['Strategy_Cum'].iloc[-1]-1)*100:.1f}%)"
 )
+
+if ai_comment:
+    message += f"\n\n🧠 <b>AI Sector Strategist Commentary:</b>\n<i>{ai_comment}</i>"
 
 send_telegram_message(message, output_file)

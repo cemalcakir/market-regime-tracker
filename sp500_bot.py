@@ -5,6 +5,9 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+# Ortak AI Servis importu
+from ai_service import MarketAIAnalyst
+
 # ==========================================
 # 1. CREDENTIALS MANAGEMENT
 # ==========================================
@@ -19,6 +22,9 @@ if TOKEN is None or CHAT_ID is None:
         CHAT_ID = config.TELEGRAM_CHAT_ID
     except:
         print("Error: Telegram credentials not found!")
+
+# AI Analist Servisini Başlat
+ai_analyst = MarketAIAnalyst()
 
 # ==========================================
 # 2. DATASET & CALCULATIONS
@@ -253,7 +259,7 @@ plt.savefig(output_file, facecolor=fig.get_facecolor())
 plt.close()
 
 # ==========================================
-# 4. TELEGRAM DISPATCH
+# 4. TELEGRAM DISPATCH & AI COMMENTARY
 # ==========================================
 def telegram_dispatch(mesaj, dosya_yolu=None):
     if not TOKEN or not CHAT_ID:
@@ -299,6 +305,22 @@ adx_note = (
     else "weak index (market undecided)"
 )
 
+# AI Strategy Commentary Generation for S&P 500
+sp500_payload = {
+    "Status": status,
+    "Market Regime": regime,
+    "Close Price": float(last_price),
+    "EMA20": float(df["EMA20"].iloc[-1]),
+    "EMA50": float(df["EMA50"].iloc[-1]),
+    "EMA200": float(last_ema200),
+    "RSI": float(last_rsi),
+    "ADX": float(last_adx),
+    "Dip Buy Signal": bool(df["dip_buy"].iloc[-1]),
+    "Strong Buy Signal": bool(df["strong_buy"].iloc[-1]),
+    "Strong Sell Signal": bool(df["strong_sell"].iloc[-1])
+}
+ai_comment = ai_analyst.generate_commentary("S&P 500 Index (^GSPC)", sp500_payload)
+
 mesaj = (
     f"🇺🇸 <b>S&P 500 (SPX) ANALYSIS REPORT</b>\n\n"
     f"<b>Status:</b>  {status}\n"
@@ -308,5 +330,8 @@ mesaj = (
     f"📊 <b>RSI:</b>  {last_rsi:.1f} : {rsi_note}\n"
     f"📈 <b>ADX:</b>  {last_adx:.1f} : {adx_note}"
 )
+
+if ai_comment:
+    mesaj += f"\n\n🧠 <b>AI Market Strategist Commentary:</b>\n<i>{ai_comment}</i>"
 
 telegram_dispatch(mesaj, output_file)

@@ -6,6 +6,9 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+# Ortak AI Servis importu
+from ai_service import MarketAIAnalyst
+
 # GRAFİK PENCERESİ AÇILMASINI ENGELLER
 plt.switch_backend('Agg')
 
@@ -32,6 +35,9 @@ STOCK_SETTINGS = {
     "ASELS.IS": {"name": "Aselsan", "upper_threshold": 0.45, "lower_threshold": -0.08, "rsi_upper": 85, "rsi_lower": 26},
     "THYAO.IS": {"name": "THY", "upper_threshold": 0.25, "lower_threshold": -0.05, "rsi_upper": 75, "rsi_lower": 30}
 }
+
+# AI Analist Servisini Başlat
+ai_analyst = MarketAIAnalyst()
 
 # ==========================================
 # 2. ANALİZ MOTORU
@@ -90,7 +96,7 @@ def analyze_and_send(ticker, usd_data, setting):
         ax1.scatter(df[df['g_sat']].index, df[df['g_sat']]['Close'], marker='v', color='#FF3131', s=S_SIZE+50, label='STRONG SELL', zorder=5)
         
         ax1.legend(loc='upper left', frameon=True, facecolor='#151924', edgecolor='gray')
-        ax1.set_title(f"{setting['name']} - {current_status_plt}", color='gold', fontsize=16, fontweight='bold')
+        ax1.set_title(f"{setting['name']}\n{current_status_plt}", color='gold', fontsize=16, fontweight='bold')
         
         ax2.set_facecolor('#0B0E11')
         ax2.plot(df.index, df['RSI'], color='cyan', lw=1.2)
@@ -102,6 +108,16 @@ def analyze_and_send(ticker, usd_data, setting):
         plt.savefig(filename, facecolor='#0B0E11')
         plt.close(fig)
 
+        # AI Comment Generation
+        metrics_data = {
+            "Price (USD)": float(last_row['Close']),
+            "EMA200 (USD)": float(last_row['EMA200']),
+            "Deviation (%)": float(last_row['Deviation'] * 100),
+            "RSI": float(last_row['RSI']),
+            "Current Status": current_status_plt
+        }
+        ai_comment = ai_analyst.generate_commentary(setting['name'], metrics_data)
+
         # SINGLE MESSAGE DISPATCH (Text + Image)
         if TOKEN and CHAT_ID:
             clean_ticker = ticker.split('.')[0]
@@ -109,7 +125,10 @@ def analyze_and_send(ticker, usd_data, setting):
                        f"Status: {current_status_msg}\n"
                        f"Price: ${last_row['Close']:.2f}\n"
                        f"EMA200 Deviation: %{last_row['Deviation']*100:+.1f}\n"
-                       f"RSI: {last_row['RSI']:.1f}")
+                       f"RSI: {last_row['RSI']:.1f}\n")
+            
+            if ai_comment:
+                message += f"\n🧠 <b>AI Strategist Commentary:</b>\n<i>{ai_comment}</i>"
             
             with open(filename, 'rb') as photo:
                 requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", 

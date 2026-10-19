@@ -6,6 +6,9 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+# Ortak AI Servis importu
+from ai_service import MarketAIAnalyst
+
 # ==========================================
 # 1. SECURITY AND CONFIGURATION
 # ==========================================
@@ -15,11 +18,13 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 if not TELEGRAM_TOKEN:
     try:
         import config
-
         TELEGRAM_TOKEN = config.TELEGRAM_TOKEN
         TELEGRAM_CHAT_ID = config.TELEGRAM_CHAT_ID
     except ImportError:
         print("Error: Credentials not found!")
+
+# AI Analist Servisini Başlat
+ai_analyst = MarketAIAnalyst()
 
 
 def telegram_dispatch(message, chart_path=None):
@@ -143,6 +148,21 @@ adx_note = (
     else "weak index (market undecided or sideways)"
 )
 
+# AI Comment Generation
+metrics_data = {
+    "Asset": "Gold Futures (GC=F)",
+    "Status": status,
+    "Market Regime": regime,
+    "Close Price": float(last['Close']),
+    "EMA20": float(last['EMA20']),
+    "EMA200": float(last['EMA200']),
+    "RSI": float(last['RSI']),
+    "ADX": float(last['ADX']),
+    "Buy Signal": bool(last['buy']),
+    "Sell Signal": bool(last['s_sell'])
+}
+ai_comment = ai_analyst.generate_commentary("Gold Futures", metrics_data)
+
 mesaj = (
     f"🟡 <b>GOLD ANALYSIS REPORT</b>\n\n"
     f"<b>Status:</b>  {status}\n"
@@ -150,8 +170,11 @@ mesaj = (
     f"{description}\n\n"
     f"💰 <b>Price:</b>  ${last['Close']:.2f}\n"
     f"📊 <b>RSI:</b>  {last['RSI']:.1f} : {rsi_note}\n"
-    f"📈 <b>ADX:</b>  {last['ADX']:.1f} : {adx_note}"
+    f"📈 <b>ADX:</b>  {last['ADX']:.1f} : {adx_note}\n"
 )
+
+if ai_comment:
+    mesaj += f"\n🧠 <b>AI Strategist Commentary:</b>\n<i>{ai_comment}</i>"
 
 # ==========================================
 # 4. PLOTTING (PRO FORMAT)
