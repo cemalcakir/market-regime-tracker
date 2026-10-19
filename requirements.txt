@@ -3,4 +3,4 @@ pandas
 numpy
 matplotlib
 requests
-google-genai>=0.1.0
+google-genai
